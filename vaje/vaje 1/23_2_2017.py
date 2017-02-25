@@ -48,3 +48,28 @@ def balansiran(niz: str) -> bool:
             op -= 1
     return op == 0
 
+
+# O(N)
+def longest_balanced(niz: str) -> int:
+    stack = [-1]
+    longest = 0
+    
+    for i, c in enumerate(niz):
+        if c == "(":
+            stack.append(i)
+        else:
+            # Delete open pair
+            stack.pop()
+            if stack: # If there is at least one open brace
+                longest = max(longest, i - stack[-1])
+            else: # Not balanced, start again from here
+                stack.append(i)
+    
+    return longest
+
+
+
+
+
+
+
