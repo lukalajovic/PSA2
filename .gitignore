@@ -90,4 +90,4 @@ ENV/
 
 # Miscellaneous
 .DS_Store
-.idea
+.idea/
