@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
-from typing import List
+from collections import Counter
+from typing import Dict, Iterable
+from typing import List, TypeVar
 from typing import Optional
 from typing import Tuple
 
 from disjoint_set import disjoint_set
 from kopica import BinaryHeap
+
+import heapq
 
 Graph = List[List[Tuple[int, float]]]
 Edges = List[Tuple[int, int, float]]
@@ -54,6 +58,54 @@ def prim(G: Graph) -> Edges:
     return mst
 
 
+T = TypeVar("T")
+
+
+def Huffman(items: Iterable[Tuple[T, float]]) -> List[Tuple[T, str]]:
+    class Node:
+        def __init__(self, freq: float, value: Optional[T], left: Optional["Node"] = None,
+                     right: Optional["Node"] = None) -> None:
+            self.freq = freq
+            self.value = value
+            self.left = left
+            self.right = right
+
+        def __lt__(self, other: "Node") -> bool:
+            return self.freq < other.freq
+
+        def __repr__(self) -> str:
+            return "Node(freq={freq}, value='{value}', left={left}, right={right})". \
+                format(freq=self.freq, value=str(self.value) if self.value else "", left=str(self.left),
+                       right=str(self.right))
+
+    heap = [Node(freq, item) for item, freq in items]
+    heapq.heapify(heap)
+
+    while len(heap) > 1:
+        fst = heapq.heappop(heap)
+        snd = heapq.heappop(heap)
+
+        new = Node(fst.freq + snd.freq, None, fst, snd)
+        heapq.heappush(heap, new)
+
+    codes = []  # type: List[Tuple[T, str]]
+
+    def get_codes(root: Node, prefix: str = "") -> None:
+        if root.value is not None:  # Leaf
+            codes.append((root.value, prefix))
+        else:
+            assert root.left is not None
+            assert root.right is not None
+            get_codes(root.left, prefix + "0")
+            get_codes(root.right, prefix + "1")
+
+    get_codes(heap[0])
+
+    codes.sort(key=lambda x: (len(x[1]), x[0]))
+
+    return codes
+
+
 def main() -> None:
     G1 = [
         [(1, 7), (3, 5)],
@@ -77,6 +129,24 @@ def main() -> None:
 
     print(kruskall(G2))
     print(prim(G2))
+
+    data = [("a", 5), ("b", 9), ("c", 12), ("d", 13), ("e", 16), ("f", 45)]  # type: List[Tuple[str, float]]
+
+    print(Huffman(data))
+
+    wiki_text = "this is an example of a huffman tree"
+    counter = {}  # type: Dict[str, float]
+
+    for c in wiki_text:
+        if c in counter:
+            counter[c] += 1
+        else:
+            counter[c] = 1
+
+    wiki_huff = Huffman(counter.items())
+    print(wiki_huff)
+    wiki_dict = dict(wiki_huff)
+    print(sum(len(wiki_dict[c]) for c in wiki_text))
 
 
 if __name__ == '__main__':
