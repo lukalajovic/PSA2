@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from enum import Enum
-from typing import TypeVar, Iterable, Optional, Generic, cast, NewType, Union
+from typing import TypeVar, Iterable, Optional, Generic, Union, Iterator
 
-from ..AbstractTree import AbstractTree
+from ..AbstractTree import AbstractSearchTree
 
 __author__ = "Filip Koprivec"
 
@@ -38,6 +38,7 @@ class RBNode(Generic[T]):
 
         def __init__(self, value: int) -> None:
             self.color = Color.BLACK
+            self.parent = self  # type: GeneralNode
 
         def __repr__(self) -> str:
             return "NIL"
@@ -48,13 +49,16 @@ class RBNode(Generic[T]):
 Node = RBNode[T]
 
 
-class RedBlackTree(AbstractTree, Generic[T]):
-    __slots__ = ("root", "data")
+class RedBlackTree(AbstractSearchTree, Generic[T]):
+    __slots__ = ("root", "data", "_size")
 
     def __init__(self, data: Optional[Iterable[T]] = None) -> None:
         super().__init__(data)
         self.root = RBNode.NIL  # type: GeneralNode[T]
-        self.data = list(data) if data else []
+        self._size = 0
+        if data:
+            for j in data:
+                self.insert(j)
 
     def insert(self, item: T) -> None:
         z = RBNode(item)
@@ -68,7 +72,9 @@ class RedBlackTree(AbstractTree, Generic[T]):
             y = x
             if z.key < x.key:
                 x = x.left_child
-            elif z.key == x.key:  # Replace
+            elif z.key > x.key:
+                x = x.right_child
+            else:  # z.key == x.key  # Replace
                 z.parent = x.parent
                 z.left_child = x.left_child
                 if z.left_child is not RBNode.NIL:
@@ -78,10 +84,7 @@ class RedBlackTree(AbstractTree, Generic[T]):
                 if z.right_child is not RBNode.NIL:
                     assert isinstance(z.right_child, RBNode)
                     z.right_child.parent = z
-                pass
                 return
-            else:
-                x = x.right_child
         z.parent = y
         if y is RBNode.NIL:  # create first entry
             self.root = z
@@ -95,6 +98,7 @@ class RedBlackTree(AbstractTree, Generic[T]):
         z.right_child = RBNode.NIL
         z.color = Color.RED
         self.insert_fixup(z)
+        self._size += 1
 
     def search(self, item: T, root: Optional[GeneralNode] = None) -> bool:
         node = self.find(item, root)
@@ -121,6 +125,7 @@ class RedBlackTree(AbstractTree, Generic[T]):
             # assert isinstance(y.right_child, RBNode)
             x = y.right_child
             if y.parent is z:
+                # We need it for delete fixup
                 x.parent = y
             else:
                 # assert isinstance(y.right_child, RBNode)
@@ -133,6 +138,7 @@ class RedBlackTree(AbstractTree, Generic[T]):
             y.left_child = z.left_child
             y.left_child.parent = y
             y.color = z.color
+        self._size -= 1
         if original_color is Color.BLACK:
             # assert isinstance(x, RBNode)
             self.delete_fixup(x)
@@ -145,12 +151,12 @@ class RedBlackTree(AbstractTree, Generic[T]):
         cur_root = root
         while cur_root is not RBNode.NIL:
             assert isinstance(cur_root, RBNode)
-            if item == cur_root.key:
-                return cur_root
             if item < cur_root.key:
                 cur_root = cur_root.left_child
-            else:
+            elif item > cur_root.key:
                 cur_root = cur_root.right_child
+            else:  # item == cur_root.key:
+                return cur_root
         # Not found
         return RBNode.NIL
 
@@ -273,21 +279,21 @@ class RedBlackTree(AbstractTree, Generic[T]):
         assert isinstance(self.root, RBNode)
         self.root.color = Color.BLACK
 
-    def transplant(self, u: Node, v: Node) -> None:
+    def transplant(self, u: GeneralNode, v: GeneralNode) -> None:
         if u.parent is RBNode.NIL:
             self.root = v
         else:
             assert isinstance(u.parent, RBNode)
-            if u == u.parent.left_child:
+            if u is u.parent.left_child:
                 u.parent.left_child = v
             else:
                 u.parent.right_child = v
         v.parent = u.parent
 
-    def delete_fixup(self, x: Node) -> None:
+    def delete_fixup(self, x: GeneralNode) -> None:
         while x != self.root and x.color is Color.BLACK:
             assert isinstance(x.parent, RBNode)
-            if x == x.parent.left_child:
+            if x is x.parent.left_child:
                 w = x.parent.right_child
                 if w.color is Color.RED:
                     w.color = Color.BLACK
@@ -295,7 +301,7 @@ class RedBlackTree(AbstractTree, Generic[T]):
                     self.rotate_left(x.parent)
                     w = x.parent.right_child
                 assert isinstance(w, RBNode)
-                if w.left_child.color is Color.BLACK and w.right_child.color == Color.BLACK:
+                if w.left_child.color is Color.BLACK and w.right_child.color is Color.BLACK:
                     w.color = Color.RED
                     x = x.parent
                 else:
@@ -322,16 +328,19 @@ class RedBlackTree(AbstractTree, Generic[T]):
                     self.rotate_right(x.parent)
                     w = x.parent.left_child
                 assert isinstance(w, RBNode)
-                if w.right_child.color == Color.BLACK and w.left_child.color == Color.BLACK:
+                if w.right_child.color is Color.BLACK and w.left_child.color is Color.BLACK:
                     w.color = Color.RED
                     x = x.parent
                 else:
-                    if w.left_child.color == Color.BLACK:
+                    if w.left_child.color is Color.BLACK:
                         w.right_child.color = Color.BLACK
                         w.color = Color.RED
                         self.rotate_left(w)
+                        assert isinstance(x.parent, RBNode)
+                        w = x.parent.left_child
                     w.color = x.parent.color
                     x.parent.color = Color.BLACK
+                    assert isinstance(w, RBNode)
                     w.left_child.color = Color.BLACK
                     assert isinstance(self.root, RBNode)
                     assert isinstance(x.parent, RBNode)
@@ -339,5 +348,34 @@ class RedBlackTree(AbstractTree, Generic[T]):
                     x = self.root
         x.color = Color.BLACK
 
+    def size(self) -> int:
+        return self._size
+
+    def in_order_traversal(self, root: Optional[GeneralNode] = None) -> Iterator[T]:
+        if root is None:
+            root = self.root
+        if root is RBNode.NIL:
+            return
+        assert isinstance(root, RBNode)
+        for j in self.in_order_traversal(root.left_child):
+            yield j
+        yield root.key
+        for j in self.in_order_traversal(root.right_child):
+            yield j
+
     def __repr__(self) -> str:
-        return "Tree({data}".format(data=repr(self.root))
+        return "Tree({data})".format(data=repr(self.root))
+
+    def successor(self, x: Node) -> GeneralNode:
+        if x.right_child is not RBNode.NIL:
+            return self.get_min_node(x.right_child)
+        while x.parent is not RBNode.NIL and x is x.parent.right_child:
+            x = x.parent
+        return x.parent
+
+    def predecessor(self, x: Node) -> GeneralNode:
+        if x.left_child is not RBNode.NIL:
+            return self.get_max_node(x.left_child)
+        while x.parent is not RBNode.NIL and x is x.parent.left_child:
+            x = x.parent
+        return x.parent
